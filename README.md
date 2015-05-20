@@ -1,0 +1,142 @@
+# Getting and Cleaning Data Course Project
+
+##Upload data into R
+
+
+```r
+X_train<-read.table("X_train.txt")
+y_train<-read.table("y_train.txt")
+X_test<-read.table("X_test.txt")
+y_test<-read.table("y_test.txt")
+subject_test<-read.table("subject_test.txt")
+subject_train<-read.table("subject_train.txt")
+feature_labs<-read.table("features.txt")
+activity_labels<-read.table("activity_labels.txt")
+```
+
+
+##1. Merge the test and training datasets
+
+First, check that the feature labels match X_test & X_train column names.
+
+
+```r
+feature_labs$V3<-paste0("V",feature_labs$V1)
+sum(!(names(X_train)==feature_labs$V3))
+```
+
+```
+## [1] 0
+```
+
+```r
+sum(!(names(X_test)==feature_labs$V3))
+```
+
+```
+## [1] 0
+```
+
+Next, change the column names of X_test & X_train to the feature names.
+
+
+```r
+names(X_train)<-feature_labs$V2
+names(X_test)<-feature_labs$V2
+```
+
+Attach the activity codes and subject labels to X_test & X_train.
+
+
+```r
+X_train2<-cbind(activitycode=y_train$V1,X_train)
+X_train2<-cbind(subject=subject_train$V1,X_train2)
+X_test2<-cbind(activitycode=y_test$V1,X_test)
+X_test2<-cbind(subject=subject_test$V1,X_test2)
+```
+
+Check that the colum names of training and testing datasets are equivalent.
+
+
+```r
+sum(!(names(X_train2)==names(X_test2)))
+```
+
+```
+## [1] 0
+```
+
+Finally, merge the training and testing datasets to form one data.frame.
+
+
+```r
+complete<-rbind(X_test2,X_train2)
+```
+
+
+##2. Extract the mean and standard deviation of measurements
+
+Note: featuresinfo.txt explains that each measured signal had an estimated mean (mean()) and standard deviation (std()). In this step, only features that contained "mean()" or "std()" were extracted. I did not extract the meanFreq() or the angle() means as these appeared to be additional calculations different from the mean and standard deviation of the measured signals.
+
+Extract a subset of the data that contains either measurement mean or standard deviation and add the "subject" and "activitycode" columns to new subsetted dataset.
+
+
+```r
+complete2<-complete[,grepl("mean\\(\\)|std\\(\\)",names(complete))]
+complete2<-cbind(complete[,1:2],complete2)
+```
+
+
+##3. Name the activities with descriptive names
+
+Clean up labels by removing "_"'s and changing to lowercase letters.
+
+
+```r
+activity_labels$V2<-gsub("_","",activity_labels$V2)
+activity_labels$V2<-tolower(activity_labels$V2)
+names(activity_labels)<-c("activitycode","activity")
+```
+
+Merge the activity labels data.frame with the complete dataset to add a column with activity names.
+
+
+```r
+complete3<-merge(activity_labels,complete2,all=TRUE)
+```
+
+
+##4. Label the dataset with descriptive variable names
+
+Note: The descriptive variable names provided with the dataset (features.txt) were added to the dataset previously in step #1. Descriptions of these variable names can be found in project_codebook.txt.
+
+Cleanup column names by removing dashes and parentheses. 
+
+
+```r
+new_names<-gsub("-","_",names(complete3))
+new_names<-gsub("\\(|\\)","",new_names)
+names(complete3)<-new_names
+```
+
+
+##5. Create a second tidy data set with the average of each variable for each activity and each subject
+
+Check for the presence of NA's.
+
+
+```r
+sum(is.na(complete3))
+```
+
+```
+## [1] 0
+```
+
+Create a new data.frame with the subject by activity averages using the aggregate function and write the new data.frame to a text file.
+
+
+```r
+project.data<-aggregate(complete3[,-c(1:3)],list(subject=complete3$subject,activity=complete3$activity),FUN=mean)
+write.table(project.data,file="project.data.txt",row.name=FALSE)
+```
